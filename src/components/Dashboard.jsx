@@ -8,6 +8,7 @@ export default function Dashboard({ onStart }) {
       </div>
 
       <h2 className="font-display text-2xl font-bold text-slate-50">Scan a 2-Page Document</h2>
+      <h2 className="font-display text-4xl font-bold text-red-600">The App Is Under Development</h2>
       <p className="mt-2 max-w-xs text-sm text-slate-400">
         Capture the front and back pages. We&apos;ll read the ID number automatically and save a ready-to-share PDF.
       </p>
@@ -29,6 +30,9 @@ export default function Dashboard({ onStart }) {
       >
         Start New Scan
       </button>
+      <p className="mt-2 max-w-xs text-sm text-slate-400">
+        Made By Minhaz
+      </p>
     </div>
   );
 }
