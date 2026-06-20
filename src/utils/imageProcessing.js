@@ -1,9 +1,15 @@
 // src/utils/imageProcessing.js
 //
+// Advanced document scanning with CamScanner-style enhancement.
+// Includes document edge detection, perspective correction, contrast enhancement,
+// and conversion to clean black-and-white scans.
+//
 // All cropping and pixel manipulation happens on in-memory <canvas>
 // elements that are never appended to the DOM and never persisted —
-// they exist only long enough to produce the data Tesseract needs,
+// they exist only long enough to produce the data needed,
 // then they become eligible for garbage collection.
+
+import { enhanceDocument, canvasToBlob } from './documentEnhancer.js';
 
 /**
  * Loads an image (from a blob: URL, data: URL, or any same-origin URL)
@@ -15,6 +21,7 @@
 export function loadImage(src) {
   return new Promise((resolve, reject) => {
     const image = new Image();
+    image.crossOrigin = 'anonymous';
     image.onload = () => resolve(image);
     image.onerror = (err) => reject(err);
     image.src = src;
@@ -97,4 +104,69 @@ export function preprocessCanvasForOcr(canvas) {
 
   ctx.putImageData(imageData, 0, 0);
   return canvas;
+}
+
+/**
+ * Applies CamScanner-style document enhancement to an image
+ * Detects document edges, corrects perspective distortion, removes background,
+ * enhances contrast, and converts to clean black-and-white scan
+ * @param {string} imageUrl - URL of the captured image
+ * @returns {Promise<{enhanced: Blob, original: Blob, canvas: HTMLCanvasElement, metadata: object}>}
+ */
+export async function enhanceDocumentImage(imageUrl) {
+  try {
+    // Apply the full enhancement pipeline
+    const { canvas, enhanced, cornerPoints } = await enhanceDocument(imageUrl);
+
+    // Convert enhanced canvas to blob
+    const enhancedBlob = await canvasToBlob(canvas, 0.95);
+
+    return {
+      enhanced: enhancedBlob,
+      canvas: canvas,
+      metadata: {
+        enhanced: enhanced,
+        cornerPoints: cornerPoints,
+        hasDocumentDetection: enhanced
+      }
+    };
+  } catch (error) {
+    console.error('Document enhancement failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Processes a captured image for both document enhancement and OCR
+ * Returns the enhanced image suitable for display/PDF and a processed version for OCR
+ * @param {string} imageUrl - URL of the captured image
+ * @returns {Promise<{enhancedUrl: string, ocrCanvas: HTMLCanvasElement, metadata: object}>}
+ */
+export async function processDocumentImage(imageUrl) {
+  try {
+    // First enhance the document
+    const { enhanced, canvas, metadata } = await enhanceDocumentImage(imageUrl);
+
+    // Create a URL for the enhanced image
+    const enhancedUrl = URL.createObjectURL(enhanced);
+
+    // Create a version for OCR (crop top-right for ID extraction)
+    const ocrCanvas = await cropTopRightRegion(enhancedUrl, {
+      heightRatio: 0.25,
+      widthRatio: 0.5,
+      upscale: 2
+    });
+
+    // Preprocess the OCR canvas
+    preprocessCanvasForOcr(ocrCanvas);
+
+    return {
+      enhancedUrl: enhancedUrl,
+      ocrCanvas: ocrCanvas,
+      metadata: metadata
+    };
+  } catch (error) {
+    console.error('Document image processing failed:', error);
+    throw error;
+  }
 }
