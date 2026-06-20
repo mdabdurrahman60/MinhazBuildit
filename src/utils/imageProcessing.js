@@ -118,8 +118,8 @@ export async function enhanceDocumentImage(imageUrl) {
     // Apply the full enhancement pipeline
     const { canvas, enhanced, cornerPoints } = await enhanceDocument(imageUrl);
 
-    // Convert enhanced canvas to blob
-    const enhancedBlob = await canvasToBlob(canvas, 0.95);
+    // Convert enhanced canvas to blob with maximum quality
+    const enhancedBlob = await canvasToBlob(canvas, 0.98);
 
     return {
       enhanced: enhancedBlob,

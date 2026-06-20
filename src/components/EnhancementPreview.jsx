@@ -43,7 +43,7 @@ export default function EnhancementPreview({ imageUrl, onConfirm, onCancel, titl
         setEnhancedPreview(previewCanvas.toDataURL('image/jpeg'));
         
         // Convert the full-size enhanced canvas to blob for use
-        const blob = await canvasToBlob(canvas, 0.95);
+        const blob = await canvasToBlob(canvas, 0.98);
         setEnhancedBlob(blob);
         
         setEnhancementMetadata({

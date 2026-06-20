@@ -195,40 +195,41 @@ function enhanceDocumentImage(canvas) {
       cv.cvtColor(src, gray, src.channels() === 4 ? cv.COLOR_RGBA2GRAY : cv.COLOR_RGB2GRAY);
       src.delete();
 
-      // Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
-      // This removes shadows and improves contrast
-      const clahe = cv.createCLAHE(2.0, new cv.Size(8, 8));
+      // Apply CLAHE with higher clip limit for better contrast
+      // This removes shadows and improves contrast while preserving details
+      const clahe = cv.createCLAHE(3.5, new cv.Size(8, 8));
       clahe.apply(gray, dst);
       gray.delete();
     } else {
       cv.cvtColor(src, dst, cv.COLOR_GRAY2GRAY);
     }
 
-    // Bilateral filter to reduce noise while preserving edges
-    const filtered = new cv.Mat();
-    cv.bilateralFilter(dst, filtered, 9, 75, 75);
+    // Apply unsharp mask for text sharpening (gentle)
+    const blurred = new cv.Mat();
+    cv.GaussianBlur(dst, blurred, new cv.Size(3, 3), 0.5);
+    const sharpened = new cv.Mat();
+    cv.addWeighted(dst, 1.3, blurred, -0.3, 0, sharpened);
+    blurred.delete();
     dst.delete();
 
-    // Morphological operations to remove small noise
-    const kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(3, 3));
-    const morphed = new cv.Mat();
-    cv.morphologyEx(filtered, morphed, cv.MORPH_OPEN, kernel);
+    // Bilateral filter with lower aggressiveness to preserve edges and fine text
+    const filtered = new cv.Mat();
+    cv.bilateralFilter(sharpened, filtered, 5, 50, 50);
+    sharpened.delete();
+
+    // Adaptive thresholding with larger block size and lower C for detail preservation
+    const bw = new cv.Mat();
+    cv.adaptiveThreshold(filtered, bw, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 15, 3);
     filtered.delete();
 
-    // Adaptive thresholding for clean black and white
-    const bw = new cv.Mat();
-    cv.adaptiveThreshold(morphed, bw, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2);
-    morphed.delete();
+    // Minimal morphology: only close small holes, avoid aggressive opening
+    const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(2, 2));
+    const final = new cv.Mat();
+    cv.morphologyEx(bw, final, cv.MORPH_CLOSE, kernel);
+    bw.delete();
     kernel.delete();
 
-    // Apply morphological close to fill small holes
-    const kernel2 = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(2, 2));
-    const final = new cv.Mat();
-    cv.morphologyEx(bw, final, cv.MORPH_CLOSE, kernel2);
-    bw.delete();
-    kernel2.delete();
-
-    // Convert back to canvas
+    // Convert back to canvas - preserve full resolution
     const resultCanvas = document.createElement('canvas');
     resultCanvas.width = canvas.width;
     resultCanvas.height = canvas.height;
@@ -426,7 +427,7 @@ export async function createCornerPreview(imageUrl, cornerPoints) {
  * @param {number} quality - JPEG quality (0-1)
  * @returns {Promise<Blob>}
  */
-export function canvasToBlob(canvas, quality = 0.95) {
+export function canvasToBlob(canvas, quality = 0.98) {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {

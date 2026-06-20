@@ -51,7 +51,15 @@ export async function generateAndDownloadPdf(imageUrls, fileBaseName) {
 
   for (const url of imageUrls) {
     const arrayBuffer = await readUrlAsArrayBuffer(url);
-    const embeddedImage = await pdfDoc.embedJpg(arrayBuffer);
+
+    let embeddedImage;
+    try {
+      // Try JPEG first for maximum quality with scans
+      embeddedImage = await pdfDoc.embedJpg(arrayBuffer);
+    } catch (error) {
+      // Fallback to PNG if JPEG embedding fails
+      embeddedImage = await pdfDoc.embedPng(arrayBuffer);
+    }
 
     const scale = A4_WIDTH_POINTS / embeddedImage.width;
     const pageWidth = A4_WIDTH_POINTS;
